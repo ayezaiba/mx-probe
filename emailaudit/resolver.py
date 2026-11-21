@@ -117,6 +117,27 @@ def preflight():
         return (True, f'OK via DNS over HTTPS {DOH_URLS[0]} (port 53 not answering: system resolver {resolver_ips()} {st}, fallback {FALLBACK_NAMESERVERS} {st2}; usual cause: VPN tunnel up)')
     return (False, f'no DNS at all (system {st}, fallback {st2}, https {st3}); check VPN / network')
 
+def pc_online(timeout=2.5):
+    import socket
+    for host in ('1.1.1.1', '8.8.8.8', '208.67.222.222'):
+        try:
+            socket.create_connection((host, 443), timeout=timeout).close()
+            return True
+        except OSError:
+            continue
+    return False
+
+def confirm_negative(name, rtype, status):
+    if status not in (NXDOMAIN, NOANSWER):
+        return False
+    try:
+        if not pc_online():
+            return False
+        st, ans = _resolve_doh(name, rtype)
+    except Exception:
+        return False
+    return st == status and (not ans)
+
 def txt_strings(name):
     status, rds = query(name, 'TXT')
     if status != OK:
