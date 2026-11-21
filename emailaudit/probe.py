@@ -38,7 +38,9 @@ def _probe(addr, timeout):
     dom = addr.rsplit('@', 1)[-1]
     st, ans = R.query(dom, 'MX')
     if st == R.NXDOMAIN:
-        return ('dead', f'{dom} does not exist in DNS (NXDOMAIN)')
+        if R.confirm_negative(dom, 'MX', R.NXDOMAIN):
+            return ('dead', f'{dom} does not exist in DNS (NXDOMAIN, confirmed over HTTPS)')
+        return ('unknown', f'{dom}: system resolver said NXDOMAIN, DNS over HTTPS did not confirm it (or this PC is offline)')
     exch = [(a.preference, str(a.exchange).rstrip('.')) for a in ans or []]
     if exch and all((h == '' for _, h in exch)):
         return ('dead', f'{dom} publishes a null MX (RFC 7505): it accepts no mail')
@@ -47,7 +49,9 @@ def _probe(addr, timeout):
         if st == R.NOANSWER:
             sa, aa = R.query(dom, 'A')
             if sa == R.NXDOMAIN or (sa == R.NOANSWER and (not aa)):
-                return ('dead', f'{dom} has no MX and no A record: mail cannot be delivered')
+                if R.confirm_negative(dom, 'MX', R.NOANSWER) and R.confirm_negative(dom, 'A', sa):
+                    return ('dead', f'{dom} has no MX and no A record: mail cannot be delivered (confirmed over HTTPS)')
+                return ('unknown', f'{dom}: no MX and no A from the system resolver, DNS over HTTPS did not confirm (or this PC is offline)')
             if sa != R.OK:
                 return ('unknown', f'A lookup for {dom}: {sa}')
             hosts = [dom]
